@@ -1,0 +1,34 @@
+---
+title: "Figure 2"
+author: "Alexander Li"
+date: "February 26, 2021"
+output: html_document
+---
+
+
+```{r}
+###Obsolete; no longer in thesis
+require(data.table)
+require(ggplot2)
+ds = fread("Figures + Data/Runtime.csv")
+
+ds = ds[grep("Simulation4",sim_num)]
+ds = ds[order(sim_num)]
+ds[,Read_Length:=factor(c("100 to 200","500 to 600","1000 to 1100"),levels=c("100 to 200","500 to 600","1000 to 1100"))]
+
+ds[,read_length_desc:=factor(c("Short Reads","Medium Reads","Long Reads"),levels=c("Short Reads","Medium Reads","Long Reads"))]
+
+ggplot(ds,aes(x=read_length_desc, y=runtime_num, fill=read_length_desc)) + 
+    geom_bar(stat="identity") + 
+    ggtitle("Read Mapping Time by Simulation") +
+    xlab("Simulation Type")+ylab("Minutes") +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0.5),legend.position = "none")
+    # guides(fill=guide_legend(title="Simulation Type"))
+
+# ggplot(ds,aes())
+
+
+```
+
+

@@ -1,0 +1,89 @@
+---
+title: "Detection Time by Viral Concentration"
+author: "Alexander Li"
+date: "March 1, 2021"
+output: html_document
+---
+
+```{r}
+###Detection time by viral concentration
+require(data.table)
+require(knitr)
+require(kableExtra)
+
+ds = fread("Figures + Data/Simulation runtime med + low concentrations.csv")
+ds = ds[!is.na(runtime),]
+ds[,rep_num:=NULL]
+
+ds1.1 = fread("Figures + Data/Simulation_1000x_runtime.csv")
+ds1.1[,avg_read_length:=NULL]
+ds1.1[,Rep:=NULL]
+setnames(ds1.1,"Reads_Mapped","Total_Reads")
+
+ds = rbind(ds,ds1.1)
+ds[,runtime:=as.numeric(runtime)]
+ds = ds[!is.na(runtime)]
+
+
+ds2 = ds[,.(
+    Total_Simulations = .N,
+    Mean_Detection_Time = round(mean(runtime),3),
+    Median_First_Virus_Read_ID = round(median(Total_Reads))),
+    by=sim_num]
+
+ds2[,Viral_Concentration_MVM_to_CHO:=c("15:1","154:1","1538:1")]
+
+old_names = names(ds2)
+setnames(ds2,gsub("_"," ",names(ds2)))
+setnames(ds2,"Mean Detection Time","Mean Detection Time (mins)")
+
+setcolorder(ds2,5)
+
+viral_reads = 5149/2750
+host_reads = 2412249049/2750
+
+
+kable(ds2[,-c("sim num")], "html",table.attr = "style='width:2%;'") %>%
+    # column_spec (1:4,border_left = T, border_right = T) %>%
+    kable_styling(full_width = F) %>% 
+    column_spec(c(1,3,4), width = "4cm")
+
+
+require(ggplot2)
+standard_dev = ds[,sd(runtime),by=sim_num]
+spread = ds[,.(max(runtime),min(runtime)),by=sim_num]
+ds2[,c("Viral Concentration MVM to CHO"):=factor(ds2$`Viral Concentration MVM to CHO`,levels=ds2$`Viral Concentration MVM to CHO`)]
+ds2[,standard_dev:=standard_dev$V1]
+ds2[,c("min","max"):=.(spread$V1,spread$V2)]
+
+
+# ggplot(ds2,aes(x=factor(ds2$`Viral Concentration MVM to CHO`,levels=ds2$`Viral Concentration MVM to CHO`),y=ds2$`Mean Detection Time (mins)`,fill=c("blue","green","red")))+
+#     geom_bar(stat="identity") + 
+#     theme_bw() +
+#     theme(legend.position = "none")+
+#     xlab("Viral Concentration MVM to CHO")+
+#     ylab("Detection Time (mins)")+
+#     ggtitle("Detection Time by Viral Concentration") +
+#     geom_errorbar(aes(ymin=ds2$`Mean Detection Time (mins)`-standard_dev,
+#                       ymax=ds2$`Mean Detection Time (mins)`+standard_dev),
+#                   width=.2)
+
+ds[,Concentration:="15:1"]
+ds[sim_num=="Simulation6.4",Concentration:="154:1"]
+ds[sim_num=="Simulation6.3",Concentration:="1538:1"]
+ds[,Concentration:=factor(Concentration,levels=ds2$`Viral Concentration MVM to CHO`)]
+
+boxplot(ds$runtime~ds$Concentration,main="Detection Time by Viral Concentration",xlab="Viral Concentration MVM to CHO",ylab="Detection Time (mins)")
+
+
+
+
+
+
+
+
+```
+
+
+
+

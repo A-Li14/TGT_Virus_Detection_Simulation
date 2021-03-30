@@ -1,0 +1,73 @@
+---
+title: "Classification Accuracy by Read Length"
+author: "Alexander Li"
+date: "February 26, 2021"
+output: html_document
+---
+
+
+```{r}
+require(data.table)
+
+ds = fread("Figures + Data/Classification Accuracy by Read Length.csv")
+
+ds
+
+require(ggplot2)
+
+ds[,V1:=factor(V1,levels=unique(V1))]
+ggplot(ds,aes(x=rep(seq(50,3950,50),3),y=Sensitivity,group=Error_Rate,col=Error_Rate)) +
+    geom_line(size=1.25) + 
+    ggtitle("Classification Accuracy by Read Length") + 
+    xlab("Read Length") + 
+    theme_bw() + 
+    theme(legend.position=c(.85,.25),plot.title = element_text(hjust = 0.5)) + 
+    ylab("Accuracy")
+
+
+# plot(ds$Sensitivity)
+
+
+
+```
+
+
+```{r}
+require(knitr)
+require(kableExtra)
+# kable(ds)
+ds[,Sensitivity:=round(Sensitivity,3)]
+
+# ds2 = ds[0,]
+
+
+grouping_factor = 5
+
+total_reads_grouped = sapply(unique(ds$Error_Rate),function(x){
+    sapply(seq(1,round(sum(ds$Error_Rate==x)/grouping_factor)),function(y) {
+        ds[Error_Rate==x,][((y-1)*grouping_factor+1):(y*grouping_factor),sum(Total_Reads,na.rm=T)]
+    })
+})
+
+aligned_reads_grouped = sapply(unique(ds$Error_Rate),function(x){
+    sapply(seq(1,round(sum(ds$Error_Rate==x)/grouping_factor)),function(y) {
+        ds[Error_Rate==x,][((y-1)*grouping_factor+1):(y*grouping_factor),sum(Aligned_Reads,na.rm=T)]
+    })
+})
+
+ds2 = data.table(Read_Length=paste0(rep(seq(0,3750,250),3)," to ",rep(seq(250,4000,250),3)), Total_Reads=c(total_reads_grouped),Aligned_Reads=c(aligned_reads_grouped),Sensitivity=round(c(aligned_reads_grouped)/c(total_reads_grouped),3))
+
+ds3 = data.table(Read_Length=unique(ds2$Read_Length),Sensitivity_10_Percent_Error = ds2[1:16,Sensitivity],Sensitivity_Percent_15_Error = ds2[17:32,Sensitivity],Sensitivity_20_Percent_Error = ds2[33:48,Sensitivity])
+
+setnames(ds3,c("Read Lengths","10% Read Error","15% Read Error","20% Read Error"))
+
+kable(ds3) %>% 
+    add_header_above(header=c(" "=1,"Classification Accuracy"=3)) %>%
+    # column_spec (1:4,border_left = T, border_right = T) %>%
+    kable_styling()
+
+
+
+```
+
+

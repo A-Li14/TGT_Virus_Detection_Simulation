@@ -1,0 +1,146 @@
+---
+title: "1000x Simulation Runtime + Sensitivity"
+author: "Alexander Li"
+date: "February 27, 2021"
+output: html_document
+---
+
+
+```{r}
+###1000x MVM in CHO analysis
+require(data.table)
+require(ggplot2)
+ds_sim = fread("Figures + Data/Simulation 1000x Sensitivity by Reads Mapped.csv")
+
+```
+
+
+```{r}
+host_bases = 2412249049 ###CHO genome
+viral_bases = 5149*1538 ###MVM genomes
+average_read_length = (500+5000)/2
+
+host_reads = ceiling(host_bases/average_read_length)
+viral_reads = ceiling(viral_bases/average_read_length)
+
+hyp_p_detect = 1-dhyper(0,viral_reads,host_reads,0:(max(ds_sim$Reads_Sequenced)))
+
+ds_sim$hyp_p_detect = hyp_p_detect
+
+ds2 = melt(ds_sim[,.(Reads_Sequenced,Simulation=p_detect,Hypergeometric=hyp_p_detect)],id.vars="Reads_Sequenced")
+
+# ggplot(ds_sim) + geom_line(aes(x=Reads_Sequenced,y=p_detect,col="blue"))+geom_line(aes(x=Reads_Sequenced,y=hyp_p_detect,col="red"))
+
+setnames(ds2,"variable","Source")
+ggplot(ds2,aes(x=Reads_Sequenced,y=value,group=Source,col=Source))+
+    geom_line(size=1.25)+
+    ylab("Sensitivity")+
+    xlab("Reads Sequenced")+
+    ggtitle("Likelihood of Detecting a Virus")+
+    theme_bw()+
+    theme(legend.position = c(.8, .2),
+          legend.title = element_blank(),
+          plot.title = element_text(hjust = 0.5))
+
+
+
+host_bases2 = 2412249049 ###CHO genome
+viral_bases2 = 5149*15 ###MVM genomes
+# average_read_length = (500+5000)/2
+
+host_reads2 = ceiling(host_bases2/average_read_length)
+viral_reads2 = ceiling(viral_bases2/average_read_length)
+
+reads_seq = seq(0,500000,1000)
+hyp_p_detect2 = 1-dhyper(0,viral_reads2,host_reads2,reads_seq)
+
+plot(reads_seq/1000,hyp_p_detect2)
+abline(v=27299/1000)
+
+```
+
+
+```{r}
+ds = fread("Figures + Data/Simulation_1000x_runtime.csv")
+
+ggplot(ds,aes(x=Reads_Mapped,y=runtime))+geom_point()
+hist(ds$runtime,main="Histogram of Runtimes",xlab="Runtime (Minutes)")
+
+ds[,Mapping_Rate:=Reads_Mapped*avg_read_length/runtime]
+hist(ds$Mapping_Rate)
+
+
+ds[,Mapping_Rate2:=Reads_Mapped/runtime]
+# hist(ds$Mapping_Rate)
+
+
+ds[,Mod100:=Reads_Mapped%%100]
+
+# par(mfrow=c(3,1))
+# ggplot(ds,aes(x=Reads_Mapped,y=Mapping_Rate/1000))+
+#     geom_point()+
+#     theme_bw()+
+#     xlab("Reads Mapped")+
+#     ylab("Bases per Minute (thousands)")+
+#     ggtitle("Base Mapping Rate by Reads Mapped")+
+#     theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(ds,aes(x=Reads_Mapped,y=Mapping_Rate2,col=Mod100))+
+    geom_point()+
+    theme_bw()+
+    xlab("Reads Mapped")+
+    ylab("Reads per Minute")+
+    ggtitle("Read Mapping Rate by Reads Mapped")+
+    theme(plot.title = element_text(hjust = 0.5),legend.title = element_text(size=8))+
+    scale_color_gradient(low="blue",high="orange",name="Reads mod100")
+
+# ggplot(ds,aes(x=avg_read_length,y=Mapping_Rate2))+
+#     geom_point()+
+#     theme_bw()+
+#     xlab("Average Read Length")+
+#     ylab("Reads per Minute")+
+#     ggtitle("Mapping Rate per Simulation")+
+#     theme(plot.title = element_text(hjust = 0.5))x
+
+
+
+ggplot(ds,aes(x=avg_read_length,y=Mapping_Rate2,col=Mod100))+
+    geom_point()+
+    theme_bw()+
+    xlab("Average Read Length")+
+    ylab("Reads per Minute")+
+    ggtitle("Read Mapping Rate by Read Length")+
+    theme(plot.title = element_text(hjust = 0.5),legend.title = element_text(size=8)) +
+    scale_color_gradient(low="blue",high="orange",name="Reads mod100")
+
+ggplot(ds,aes(x=avg_read_length,y=Mapping_Rate/1000,col=Mod100))+
+    geom_point()+
+    theme_bw()+
+    xlab("Average Read Length")+
+    ylab("Bases per Minute (thousands)")+
+    ggtitle("Base Mapping Rate by Read Length")+
+    theme(plot.title = element_text(hjust = 0.5),legend.title = element_text(size=8))+
+    scale_color_gradient(low="blue",high="orange",name="Reads mod100")
+
+# legend.title=element_text(title="Reads Mapped mod 100")
+
+
+```
+
+
+
+
+```{r}
+host_bases3 = 2412249049 ###CHO genome
+viral_bases3 = 5149*154 ###MVM genomes
+avg_read_length = 2750
+
+picks = seq(100,20000,10)
+sens = 1- dhyper(0,round(viral_bases3/avg_read_length),round(host_bases3/avg_read_length),picks)
+
+plot(picks,sens)
+ind = which.min(abs(sens-.5))
+picks[ind] ###median number of reads sequenced
+```
+
+
