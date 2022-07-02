@@ -12,7 +12,7 @@ from virus_read_detection_blastn_search import (BLASTn_CHO_DB_search,
                                                 BLASTn_RVDB_DB_search, 
                                                 BLASTn_RVDB_DB_search_result_parser)
 
-# Global
+# Global variables
 reads= []
 COUNT = 0
 mapped = []
@@ -133,6 +133,9 @@ def readsFragmentationGenerator(genome, readLenMin, readLenMax, errorRate, error
 
 
 #---------------------------------------------------------------------------------------------------
+""" Choose reads to map at random, selecting up to the number of 
+    available threads per iteration. """
+
 def readsPickerForThreading(threads):
     global mapped
     try:
@@ -211,8 +214,19 @@ def resetGlobal() :
 
 
 #---------------------------------------------------------------------------------------------------
+""" The virus read detection simulation script has the following parts:
+    1) Parse input parameters
+    2) Generate reads from virus and host reference genomes
+    3) Create main directory and sub directories to store simulation results
+    4) Save metadata of the simulation
+    5) Map reads in random order with BLAST against RVDB, stopping after meeting a conditional
+    6) Repeat step 5 for the prespecified number of times 
+"""
+
 if __name__ == "__main__":
     
+    ###Inputs for the simulation
+
     # start_time= time.time() # timer for entire experiment
     threadsNumber= int(sys.argv[1]) # number of threads
 
@@ -234,10 +248,12 @@ if __name__ == "__main__":
 
     loop_times = int(sys.argv[13])
 
+
     vTiter = '9.1x10^9 copies per mL'
     sampleVolm= '400 microL'
     ONTVirusInputSample= '0.01'
 
+    ###Read fasta files storing host and virus reference genomes
     hReadGenome = readGenomeFile(hGenomeFileName).upper() # read host refrence genome file
     hGenomeSize = len(hReadGenome)
 
@@ -248,6 +264,7 @@ if __name__ == "__main__":
         print(f"Can not enter desired read length (max) > {vGenomeSize} bases. Please try again!")
     else:
 
+        ###Copy and fragment host and virus genomes
         hGenomes = hGenomeCount * [hReadGenome]        
         [readsFragmentationGenerator(i, minReadLen, maxReadLen, percentError, readError) for i in hGenomes]
 
@@ -260,15 +277,19 @@ if __name__ == "__main__":
         os.chdir(resultDirectory) # set directory for result
 
 
+        ###Code for mapping reads and saving results
+        ###NOTE: read fragments are not generated anew for each loop.
+        ###      Instead, the order in which reads are mapped is random. 
         for i in range(loop_times) :
             
+            ###Create sub directories to store results of each loop
             loop_dir = f"Rep{str(i)}"
             os.mkdir(loop_dir)
             os.chdir(loop_dir)
 
             start_time= time.time() # timer for sequencing
 
-            
+            ###Result files
             finalResultFileName= f"{vGenomeSymbol}_FragmentsCountLength_{str(threadsNumber)}Threads_{vhRatio}VirusHostRatio_Simulation{simulationNumber}.csv"
             finalResultFile_csv= finalResultFileName.split('.csv')[0]+'_RVDB_result.csv'
 
@@ -277,7 +298,8 @@ if __name__ == "__main__":
                 csvwriter = csv.writer(csvfile)  
                 csvwriter.writerow(fields_csv)  
 
-
+            ###Save metadata of the simulation:
+            ###Date, input parameters, summary metrics of read fragments
             finalResultFile_txt= open(finalResultFileName.split('.csv')[0]+'_RVDB_result.txt', 'w')
             print('\n******************')
             print(f'Date: {today}')
@@ -315,24 +337,35 @@ if __name__ == "__main__":
             print(f'\nVirus to host ratio: {vhRatio}')
             finalResultFile_txt.write(f'\nVirus to host ratio: {vhRatio}')
 
+            ###Read fragment summary
             print(f'\nNumber of total fragments: {len(reads)}')
             print(f'{percentError}% Error per read: {readError}\n\n')
             finalResultFile_txt.write(f'\nNumber of total fragments: {len(reads)}')
             finalResultFile_txt.write(f'\n{percentError}% Error per read: {readError}\n\n')
 
+            ###Read mapping loop
             for _ in range(len(reads)):
                 COUNT+=0
                 if reads:
+                    ###Select random reads up to thread count
                     pickedReads= readsPickerForThreading(threadsNumber)
 
                     generateFragmentsFiles(pickedReads, finalResultFileName)
                     readFilesName= [fname for fname in os.listdir('.') if '_Threading.fa' in fname]
+                    
+                    ###Map reads in parallel
                     with concurrent.futures.ThreadPoolExecutor() as executor:
+                        
+                        ###Run BLAST
                         blastn_RVDB_results= executor.map(BLASTn_RVDB_DB_search, readFilesName)
+                        
+                        ###Examine BLAST results
                         for result in blastn_RVDB_results:
                             if result:
                                 alignment_num= 0
                                 for RVDB_result in result:
+                                    
+                                    ###Save data about hits between the reads and the RVDB
                                     alignment_num+=1
 
                                     BLASTn_RVDB_DB_search_result_parser(finalResultFile_txt,
@@ -344,10 +377,13 @@ if __name__ == "__main__":
                                         RVDB_result_alignment_num_detection_time= [alignment_num]+RVDB_result+[detection_time]
 
                                         csvwriter.writerow(RVDB_result_alignment_num_detection_time)  
+                                
+                                ###Stop mapping reads after detecting a hit for the target virus.
+                                ###An alternative stopping condition could be detecting multiple hits, up to a threshold 
                                 if ('minute' in RVDB_result[0].lower() or 'mvm' in RVDB_result[0].lower()): ###Change this condition to match the virus you want to detect. The simulation will stop when you find an alignment to a virus with minute or mvm in the description. 
                                     break
                         else:
-                            time.sleep(0.2) ###Not sure why Raeuf included this wait time. Alex presumes 2 rationales: 1) realistic simulation, 2) limitations by MIT supercloud. If 1), then Alex suggests removing it. 
+                            time.sleep(0.2) 
                             continue
                         break
             end_time= time.time() - start_time
