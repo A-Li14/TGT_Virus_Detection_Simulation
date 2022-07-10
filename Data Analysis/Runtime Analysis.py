@@ -1,9 +1,13 @@
+###This file analyzes the results of looped virus detection simulations
+
+
 import glob
 import pandas as pd
 import re
 
-'''Return the runtime of a simulation. Also include the number of lines'''
+
 def get_runtime(results_txt_file) :
+    '''Return the runtime of a simulation. Also include the number of lines'''
     with open(results_txt_file) as file :
         line = file.readline()
         count = 1
@@ -19,10 +23,14 @@ def get_runtime(results_txt_file) :
 ####Figure 2###########################################
 
 output_path = "/home/gridsan/alexsli/Alexander_Notebook/Simulation2/Analyzing_Results/Runtime.csv"
+
+###Find all txt files in a results directory
 results_txt = glob.glob("/home/gridsan/alexsli/Alexander_Notebook/Simulation2/*/*.txt",recursive=True)
 
 sim_data = pd.DataFrame()
 
+
+###Extract data from each text file; each text file summarizes a simulation
 runtime = []
 lines = []
 sim_num = []
@@ -35,9 +43,15 @@ for path in results_txt :
     sim_num.append(path[ind:path.find("/",ind)])
 
 
+###Store simulation data together
 sim_data ["sim_num"] = sim_num
 sim_data["runtime"] = runtime
 sim_data["lines"] = lines
+
+
+###Exclude simulation data from a prior experiment
+###Different versions of simulations were labeled "Simulation1", "Simulation2", etc. 
+###Similar simulations were labeled "Simulation1.1", "Simulation1.2", etc. 
 
 # sim_data.drop(sim_num)
 drop_ind = []
@@ -51,6 +65,8 @@ sim_data.sort_values("runtime_num")
 sim_data.drop("runtime",1)
 
 
+
+###Select and analyze data from Simulation4
 inds = [i for i in range(len(sim_data)) if sim_data.iloc[i]["sim_num"].find("Simulation4")!=-1]
 
 runtime_length = sim_data.iloc[inds]
@@ -62,18 +78,13 @@ plot = runtime_length.plot.scatter(x="Read_Length",y="runtime_num",xlabel="Read 
 plot.get_figure().savefig("Runtime by Average Read Length.png")
 
 
-###Add total number of reads to the data set
+###Add total number of reads to the data set from result csv files
 results_csv = glob.glob("/home/gridsan/alexsli/Alexander_Notebook/Simulation2/*/*result.csv",recursive=True)
 
+###Load simulation results
 total_reads = []
 sim_num = []
 for path in results_csv :
-    # temp = get_runtime(path)
-    # runtime.append(temp[0])
-    # lines.append(temp[1])
-    # ind = path.find("Simulation")
-    # ind = path.find("Simulation",ind+1)
-    # sim_num.append(path[ind:path.find("/",ind)])
     temp = pd.read_csv(path)
     read_ids = temp.query_id.str.strip("read").astype("int")
     total_reads.append(max(read_ids))
@@ -85,6 +96,8 @@ sim_data2 = pd.DataFrame()
 sim_data2["sim_num"] = sim_num
 sim_data2["Total_Reads"] = total_reads
 
+
+###Exclude data from Simulation1
 drop_ind = []
 drop_ind = [i for (i,j) in enumerate(sim_data2["sim_num"]) if j.find("Simulation1.")!=-1]
 drop_ind = drop_ind + [i for (i,j) in enumerate(sim_data2["sim_num"]) if j == "Simulation1"]
@@ -96,7 +109,9 @@ sim_data["Total_Reads"] = sim_data2.Total_Reads
 
 
 
+###Output data file
 sim_data.drop("runtime",1).to_csv(output_path,index=None)
+
 
 
 
@@ -105,6 +120,8 @@ tab2_path = glob.glob("/home/gridsan/alexsli/Alexander_Notebook/Simulation2/*6.[
 
 tab2_data = pd.DataFrame()
 
+
+###Load data from text result files
 runtime = []
 lines = []
 sim_num = []
@@ -126,6 +143,8 @@ tab2_data["runtime"] = runtime
 tab2_data["lines"] = lines
 len(tab2_data)
 
+
+###Load data from csv result files
 results_csv = glob.glob("/home/gridsan/alexsli/Alexander_Notebook/Simulation2/*6.[45]/*/*result.csv",recursive=True)
 
 total_reads = []
@@ -153,10 +172,9 @@ sum(sim_tab2.rep_num==tab2_data.rep_num)==len(sim_tab2)
 
 tab2_data['Total_Reads'] = total_reads
 
+
+###Output data
 tab2_data.to_csv("Simulation runtime med + low concentrations.csv")
-
-
-
 
 
 
@@ -170,6 +188,8 @@ len(results_txt6_3)
 
 sim_data6_3 = pd.DataFrame()
 
+
+###Load data
 runtime6_3 = []
 lines6_3 = []
 sim_num6_3 = []
@@ -196,6 +216,7 @@ sim_data6_3["runtime"] = sim_data6_3.runtime.astype("float")
 sim_data6_3.runtime.mean()
 
 
+###Load data
 ###Get total reads aligned in each simulation; since mapping stopped when a virus was detected, the highest query id will be the
 ###number of reads
 paths = glob.glob("/home/gridsan/alexsli/Alexander_Notebook/Simulation2/MVM_100Threads_YES10%ReadErrorRate_10power2VirusHostRatio_Simulation6.3/*/*RVDB_result.csv",recursive=True)
@@ -229,8 +250,12 @@ sim_data6_3.to_csv("Sim6_Hypergeometric Comparison/Simulation_1000x_runtime.csv"
 
 
 
+
+###Compare simulation results to hypergeometric simulation
 from scipy.stats import hypergeom
 import math
+
+###Calculate approximate parameters to the hypergeometric distribution based on simulation data
 host_bases = 2412249049 ###CHO
 viral_bases = 5149*1538 ###MVM
 average_read_length = (500+5000)/2
@@ -238,10 +263,14 @@ average_read_length = (500+5000)/2
 host_reads = math.ceil(host_bases/average_read_length)
 viral_reads = math.ceil(viral_bases/average_read_length)
 
+
+###Calculate likelihood of detecting virus deads
 p_detect = 1-hypergeom.pmf(M=host_reads+viral_reads,n=viral_reads,N=range(2000),k=0)
 
-plt.plot(p_detect)
 
+
+###Plot likelihood of detecting virus reads from the hypergeometric distribution and simulation results
+plt.plot(p_detect)
 
 sim_data6_3.Reads_Mapped.max()
 sim_p_detect = [(sim_data6_3.Reads_Mapped<i).sum()/1000 for i in range(sim_data6_3.Reads_Mapped.max())]
